@@ -3,6 +3,7 @@ package middleware
 import (
 	"bufio"
 	"bytes"
+	"container/ring"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -10,7 +11,7 @@ import (
 	"os"
 )
 
-func FingersCrossed(minLog slog.Level, triggerLog slog.Level, logs []LogEntry, next http.Handler) http.Handler {
+func FingersCrossed(minLog slog.Level, triggerLog slog.Level, rng *ring.Ring, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		buf := &bytes.Buffer{}
 
@@ -31,7 +32,8 @@ func FingersCrossed(minLog slog.Level, triggerLog slog.Level, logs []LogEntry, n
 			buf.WriteString(scanner.Text())
 			l := parseLog(scanner.Text())
 			if l.Level >= minLog {
-				logs = append(logs, l)
+				rng.Value = l
+				rng = rng.Next()
 			}
 			if l.Level >= triggerLog {
 				flush = true
@@ -39,10 +41,13 @@ func FingersCrossed(minLog slog.Level, triggerLog slog.Level, logs []LogEntry, n
 
 		}
 		if flush {
-			for _, l := range logs {
-				fmt.Println(l)
-			}
-			logs = nil
+			rng.Do(func(p any) {
+				if p != nil {
+					fmt.Println(p)
+				}
+			})
+			n := rng.Len()
+			rng = ring.New(n)
 		}
 	})
 }

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"container/ring"
 	"log/slog"
 	"net/http"
 	"os"
@@ -31,7 +32,7 @@ func main() {
 		logger.Warn("warn inside the handler")
 		w.Write([]byte("Hello World with warn"))
 	})
-	var logs []middleware.LogEntry
-	fg := middleware.FingersCrossed(slog.LevelInfo, slog.LevelError, logs, r)
+	rng := ring.New(5000)
+	fg := middleware.FingersCrossed(slog.LevelInfo, slog.LevelError, rng, r)
 	http.ListenAndServe(":3000", fg)
 }
