@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"bufio"
-	"bytes"
 	"container/ring"
 	"encoding/json"
 	"fmt"
@@ -11,16 +10,12 @@ import (
 	"os"
 )
 
+// FingersCrossed is a middleware that captures log entries and flushes them
 func FingersCrossed(minLog slog.Level, triggerLog slog.Level, rng *ring.Ring, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		buf := &bytes.Buffer{}
-
 		// Redirect STDOUT to a buffer
 		stdout := os.Stdout
-		rf, wf, err := os.Pipe()
-		if err != nil {
-			panic(err) //@todo
-		}
+		rf, wf, _ := os.Pipe()
 		os.Stdout = wf
 		next.ServeHTTP(w, r.WithContext(r.Context()))
 		// Reset output
@@ -29,7 +24,6 @@ func FingersCrossed(minLog slog.Level, triggerLog slog.Level, rng *ring.Ring, ne
 		flush := false
 		scanner := bufio.NewScanner(rf)
 		for scanner.Scan() {
-			buf.WriteString(scanner.Text())
 			l := parseLog(scanner.Text())
 			if l.Level >= minLog {
 				rng.Value = l
@@ -52,14 +46,14 @@ func FingersCrossed(minLog slog.Level, triggerLog slog.Level, rng *ring.Ring, ne
 	})
 }
 
-type LogEntry struct {
+type logEntry struct {
 	Time    string     `json:"time"`
 	Level   slog.Level `json:"level"`
 	Message string     `json:"msg"`
 }
 
-func parseLog(raw string) LogEntry {
-	var l LogEntry
+func parseLog(raw string) logEntry {
+	var l logEntry
 	json.Unmarshal([]byte(raw), &l)
 	return l
 }
